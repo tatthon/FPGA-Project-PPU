@@ -8,7 +8,7 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 - World background: **1280 × 480 pixels** (80 × 30 tiles).
 - Each tile is **16 × 16 pixels**; atlas has **256 tiles**.
 - Color format: **RGB222**, 2 bits per channel (6 bits per pixel).
-- Horizontal scrolling follows the character before it reaches the screen edge. Two active-high inputs also control the camera manually.
+- Horizontal scrolling follows the character before it reaches the screen edge.
 - Camera stops at the left and right world boundaries.
 - A 32 × 48 RGB222 character uses an independent tile atlas for walking and jumping with controller 1 of the Gamepad PMOD.
 
@@ -16,9 +16,6 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 
 | Input | Function |
 | --- | --- |
-| `ui_in[0] = 1`, `ui_in[1] = 0` | Move camera left (scene shifts right) |
-| `ui_in[0] = 0`, `ui_in[1] = 1` | Move camera right (scene shifts left) |
-| Neither or both camera inputs asserted | No manual camera movement |
 | Gamepad D-pad Left or Right | Move in the pressed direction, including in midair |
 | Neither or both D-pad directions pressed | Hold horizontal position on screen |
 | Gamepad A | Jump when on the ground |
@@ -26,7 +23,7 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 
 The [default Gamepad PMOD pinout](https://github.com/psychogenic/gamepad-pmod#default-tt-configuration) uses `ui_in[4]` for latch, `ui_in[5]` for clock, and `ui_in[6]` for data.
 
-The character walks 4 pixels per frame. The camera starts following when the character reaches x=304 while walking right or x=160 while walking left. When the camera reaches the world boundary at offset 0 or 640, the character can walk the remaining distance to the screen edge at x=0 or x=608. The manual camera inputs scroll by 1 pixel per frame while the D-pad is neutral or both directions are held. The leg pose changes every four walking frames. The sprite starts at y=336 so its feet sit directly above the ground at y=384.
+The character walks 4 pixels per frame. The camera starts following when the character reaches x=304 while walking right or x=160 while walking left. When the camera reaches the world boundary at offset 0 or 640, the character can walk the remaining distance to the screen edge at x=0 or x=608. The leg pose changes every four walking frames. The sprite starts at y=336 so its feet sit directly above the ground at y=384.
 
 A jump rises up to 66 pixels and uses separate poses for rising and falling. Hold a direction to move while jumping. After landing, press A again for another jump.
 

@@ -86,11 +86,6 @@ module tt_um_vga_example (
             end else if (scroll_right) begin
                 scrollOffset <= (scrollOffset > MAX_SCROLL - WALK_SPEED)
                               ? MAX_SCROLL : scrollOffset + WALK_SPEED;
-            end else if (!walk_left && !walk_right) begin
-                if (ui_in[0] && !ui_in[1] && (scrollOffset != 10'd0))
-                    scrollOffset <= scrollOffset - 10'd1;
-                else if (!ui_in[0] && ui_in[1] && (scrollOffset != MAX_SCROLL))
-                    scrollOffset <= scrollOffset + 10'd1;
             end
 
             if (step_left)

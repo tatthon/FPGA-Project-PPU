@@ -20,8 +20,8 @@ project:
     - "gamepad_pmod.v"
 
 pinout:
-  ui[0]: "Camera left"
-  ui[1]: "Camera right"
+  ui[0]: ""
+  ui[1]: ""
   ui[2]: ""
   ui[3]: ""
   ui[4]: "Gamepad PMOD latch"
