@@ -3,7 +3,7 @@ project:
   title: "Moving Forest with Walking Sprite"
   author: ""
   discord: ""
-  description: "640x480 VGA forest tile map with a horizontally walking RGB222 character sprite"
+  description: "640x480 VGA forest tile map with a walking and jumping RGB222 character sprite"
   language: "Verilog"
   clock_hz: 25175000
 

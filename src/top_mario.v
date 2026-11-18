@@ -25,7 +25,7 @@ module tt_um_vga_example (
         .vpos(pix_y)
     );
 
-    wire pad_left, pad_right;
+    wire pad_left, pad_right, pad_a;
     gamepad_pmod_single gamepad (
         .rst_n(rst_n),
         .clk(clk),
@@ -35,7 +35,7 @@ module tt_um_vga_example (
         .b(), .y(), .select(), .start(), .up(), .down(),
         .left(pad_left),
         .right(pad_right),
-        .a(), .x(), .l(), .r(), .is_present()
+        .a(pad_a), .x(), .l(), .r(), .is_present()
     );
 
     reg [9:0] scrollOffset;
@@ -49,11 +49,18 @@ module tt_um_vga_example (
     localparam [9:0] CAMERA_FOLLOW_LEFT = 10'd160;
     localparam [9:0] CAMERA_FOLLOW_RIGHT = (10'd640 - PLAYER_WIDTH) / 2;
     localparam [9:0] GROUND_Y = 10'd384;
-    localparam [9:0] PLAYER_Y = GROUND_Y - PLAYER_HEIGHT;
+    localparam [9:0] PLAYER_GROUND_Y = GROUND_Y - PLAYER_HEIGHT;
+    localparam signed [5:0] JUMP_SPEED = 6'sd11;
     reg [9:0] player_x;
     reg player_right;
     reg [1:0] walk_phase;
     reg walk_frame;
+    reg pad_a_prev, jump_pending;
+    reg [6:0] jump_height;
+    reg signed [5:0] jump_velocity;
+    wire airborne = (jump_height != 7'd0);
+    wire jump_pressed = pad_a && !pad_a_prev;
+    wire signed [7:0] next_jump_height = $signed({1'b0, jump_height}) + jump_velocity;
     wire walk_left = pad_left && !pad_right;
     wire walk_right = pad_right && !pad_left;
     wire scroll_left = walk_left && (player_x <= CAMERA_FOLLOW_LEFT) &&
@@ -91,13 +98,45 @@ module tt_um_vga_example (
             else if (step_right)
                 player_x <= player_x + WALK_SPEED;
 
-            if (walking) begin
+            if (walking)
                 player_right <= walk_right;
+
+            if (walking && !airborne) begin
                 walk_phase <= walk_phase + 2'd1;
                 if (&walk_phase) walk_frame <= ~walk_frame;
             end else begin
                 walk_phase <= 2'd0;
                 walk_frame <= 1'b0;
+            end
+        end
+    end
+
+    // Capture short A presses between video frames. Airborne presses
+    // are ignored, so each jump requires a fresh press from the ground.
+    always @(posedge clk) begin
+        if (!rst_n) begin
+            pad_a_prev <= 1'b0;
+            jump_pending <= 1'b0;
+            jump_height <= 7'd0;
+            jump_velocity <= 6'sd0;
+        end else begin
+            pad_a_prev <= pad_a;
+            if (frame_tick) begin
+                jump_pending <= 1'b0;
+                if (airborne) begin
+                    if (next_jump_height <= 8'sd0) begin
+                        jump_height <= 7'd0;
+                        jump_velocity <= 6'sd0;
+                    end else begin
+                        jump_height <= next_jump_height[6:0];
+                        jump_velocity <= jump_velocity - 6'sd1;
+                    end
+                end else if (jump_pending || jump_pressed) begin
+                    jump_height <= {1'b0, JUMP_SPEED};
+                    jump_velocity <= JUMP_SPEED - 6'sd1;
+                end
+            end else if (jump_pressed && !airborne) begin
+                jump_pending <= 1'b1;
             end
         end
     end
@@ -112,18 +151,20 @@ module tt_um_vga_example (
         .color(bg_color)
     );
 
-    // Eight 8x8 tiles, drawn at 2x scale. Bit 6 marks an opaque pixel.
-    // Both poses share the top four tiles and use separate bottom pairs.
-    reg [6:0] player_tiles [0:511];
+    // Twelve 8x8 tiles, drawn at 2x scale. Bit 6 marks an opaque pixel.
+    // The poses share the top four tiles and use separate bottom pairs.
+    reg [6:0] player_tiles [0:767];
     initial $readmemh("../data/player_tiles.mem", player_tiles);
 
     wire [9:0] sprite_dx = pix_x - player_x;
-    wire [9:0] sprite_dy = pix_y - PLAYER_Y;
+    wire [9:0] sprite_dy = pix_y - (PLAYER_GROUND_Y - {3'b000, jump_height});
     wire sprite_in_box = (sprite_dx < PLAYER_WIDTH) && (sprite_dy < PLAYER_HEIGHT);
     wire [3:0] sprite_x = player_right ? sprite_dx[4:1] : ~sprite_dx[4:1];
     wire [4:0] sprite_y = sprite_dy[5:1];
-    wire [1:0] tile_row = sprite_y[4] ? {1'b1, walk_frame} : {1'b0, sprite_y[3]};
-    wire [8:0] sprite_address = {tile_row, sprite_x[3], sprite_y[2:0], sprite_x[2:0]};
+    wire [2:0] leg_tile_row = airborne ? {2'b10, (jump_velocity <= 6'sd0)}
+                                     : {2'b01, walk_frame};
+    wire [2:0] tile_row = sprite_y[4] ? leg_tile_row : {2'b00, sprite_y[3]};
+    wire [9:0] sprite_address = {tile_row, sprite_x[3], sprite_y[2:0], sprite_x[2:0]};
 
     // Match the background's two-clock pixel pipeline.
     reg [6:0] sprite_pixel_d1, sprite_pixel_d2;
