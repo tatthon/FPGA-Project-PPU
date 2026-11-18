@@ -10,7 +10,7 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 - Color format: **RGB222**, 2 bits per channel (6 bits per pixel).
 - **Manual horizontal scrolling** via two active-high inputs.
 - Camera stops at the left and right world boundaries.
-- An animated 16 × 24 RGB222 character patrols left and right across the screen and flips to face its direction of travel.
+- A 16 × 24 RGB222 character walks and faces left or right while a direction is held on controller 1 of the Gamepad PMOD.
 
 ## Controls
 
@@ -19,11 +19,13 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 | `ui_in[0] = 1`, `ui_in[1] = 0` | Move camera left (scene shifts right) |
 | `ui_in[0] = 0`, `ui_in[1] = 1` | Move camera right (scene shifts left) |
 | Neither or both inputs asserted | Hold camera position |
-| `rst_n = 0` | Reset camera to the left edge |
+| Gamepad D-pad Left or Right | Walk in the pressed direction |
+| Neither or both D-pad directions pressed | Stand still |
+| `rst_n = 0` | Reset camera and character position |
 
-Scrolling changes the camera position once per frame (1 pixel per frame). The character moves 2 pixels per frame between screen x positions 16 and 608. Its legs animate every eight frames. The character is drawn at y=408; adjust `PLAYER_Y` in `src/top_mario.v` to place it on a different row of the map. Camera offsets range from 0 to 640 pixels (`1280 - 640`).
+The [default Gamepad PMOD pinout](https://github.com/psychogenic/gamepad-pmod#default-tt-configuration) uses `ui_in[4]` for latch, `ui_in[5]` for clock, and `ui_in[6]` for data.
 
-> Inputs are synchronized to the pixel clock but **not debounced**. A physical mechanical button may require external debounce logic.
+Scrolling changes the camera position once per frame (1 pixel per frame). The character moves 2 pixels per frame between screen x positions 16 and 608. Its leg pose changes every eight frames while moving. The character is drawn at y=408. Adjust `PLAYER_Y` in `src/top_mario.v` to place it on a different row of the map. Camera offsets range from 0 to 640 pixels (`1280 - 640`).
 
 ## Project structure
 
@@ -35,6 +37,7 @@ Scrolling changes the camera position once per frame (1 pixel per frame). The ch
 │   ├── top_mario.v          # tt_um_vga_example top-level, controls and RGB outputs
 │   ├── hsync_generator.v    # VGA counters and synchronization
 │   ├── map_rom.v            # 80 × 30 tile-map ROM
+│   ├── gamepad_pmod.v       # Serial gamepad interface
 │   └── bg_renderer.v        # 256-tile pixel atlas lookup
 └── data/
     ├── map2.mem            # 2,400 tile IDs, 8-bit hexadecimal
@@ -86,22 +89,22 @@ For example, with Icarus Verilog installed:
 ```bash
 cd src
 iverilog -g2012 -s tt_um_vga_example -o sim.vvp \
-  top_mario.v hsync_generator.v map_rom.v bg_renderer.v
+  top_mario.v hsync_generator.v map_rom.v bg_renderer.v gamepad_pmod.v
 ```
 
 This command only **compiles** the design. To exercise the inputs and inspect VGA timing/image output, run it using an appropriate testbench (not included in this minimal project).
 
 ## Tiny Tapeout implementation note
 
-`info.yaml` lists the four source files and requests `tiles: "1x1"`, but this is **not a verified fit**. The atlas alone contains `65,536 × 6 = 393,216` bits; the tile map adds `2,400 × 8 = 19,200` bits. Together that is **412,416 ROM bits** before implementation overhead, likely far beyond a 1×1 Tiny Tapeout tile if mapped into standard cells.
+`info.yaml` requests a provisional tile count of `tiles: "1x1"`. The atlas alone contains `65,536 × 6 = 393,216` bits; the tile map adds `2,400 × 8 = 19,200` bits. Together that is **412,416 ROM bits** before implementation overhead, likely far beyond a 1×1 Tiny Tapeout tile if mapped into standard cells.
 
 **Simulation using `$readmemh` does not prove ASIC synthesizability or area feasibility.** Before a tapeout, check the synthesis flow's treatment of ROM initialization and optimize/reduce the stored image data or choose suitable memory resources.
 
 ## Current limitations
 
-- The character is a simple built-in pixel-art sprite; movement is an automatic horizontal patrol, with no jumping, physics, or collisions.
+- The built-in pixel-art sprite supports horizontal movement only.
 - At the right edge, the scene stops; it does not wrap seamlessly.
-- Button presses update camera position at frame boundaries (not instantaneously each clock cycle).
+- Camera and character positions update at frame boundaries.
 - RTL was prepared for the described project; **a full simulator and ASIC synthesis verification has not been completed**.
 
 ## License

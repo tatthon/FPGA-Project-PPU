@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-// Moving background with an animated, horizontally patrolling character.
+// Moving background with an animated, gamepad-controlled character.
 // Compatible with the original Tiny Tapeout VGA pin assignment.
 module tt_um_vga_example (
     input  wire [7:0] ui_in,
@@ -25,14 +25,29 @@ module tt_um_vga_example (
         .vpos(pix_y)
     );
 
-    // Each frame, move the camera by one pixel; wrap at the end of
-    // the 1280-pixel-wide map (visible screen width is 640 pixels).
+    wire pad_left, pad_right;
+    gamepad_pmod_single gamepad (
+        .rst_n(rst_n),
+        .clk(clk),
+        .pmod_latch(ui_in[4]),
+        .pmod_clk(ui_in[5]),
+        .pmod_data(ui_in[6]),
+        .b(), .y(), .select(), .start(), .up(), .down(),
+        .left(pad_left),
+        .right(pad_right),
+        .a(), .x(), .l(), .r(), .is_present()
+    );
+
     reg [9:0] scrollOffset;
     wire frame_tick = (pix_x == 10'd0) && (pix_y == 10'd480);
+    localparam [9:0] PLAYER_MIN_X = 10'd16;
+    localparam [9:0] PLAYER_MAX_X = 10'd608;
     reg [9:0] player_x;
     reg player_right;
     reg [2:0] walk_phase;
     reg walk_frame;
+    wire step_left = pad_left && !pad_right && (player_x > PLAYER_MIN_X);
+    wire step_right = pad_right && !pad_left && (player_x < PLAYER_MAX_X);
     always @(posedge clk) begin
         if (!rst_n) begin
             scrollOffset <= 10'd0;
@@ -41,31 +56,24 @@ module tt_um_vga_example (
             walk_phase <= 3'd0;
             walk_frame <= 1'b0;
         end else if (frame_tick) begin
-            if(ui_in[0] && !ui_in[1]) begin 
-              scrollOffset <= (scrollOffset == 10'0)
+            if (ui_in[0] && !ui_in[1]) begin
+              scrollOffset <= (scrollOffset == 10'd0)
                             ? 10'd0 : scrollOffset - 10'd1;
             end
-            if(!ui_in[0] && ui_in[1]) begin 
+            if (!ui_in[0] && ui_in[1]) begin
               scrollOffset <= (scrollOffset == 10'd640)
                             ? 10'd640 : scrollOffset + 10'd1;
             end
 
-            // Walk back and forth across the visible 640-pixel play area.
-            if (player_right) begin
-                if (player_x >= 10'd606) begin
-                    player_x <= 10'd608;
-                    player_right <= 1'b0;
-                end else player_x <= player_x + 10'd2;
+            if (step_left || step_right) begin
+                player_x <= step_right ? player_x + 10'd2 : player_x - 10'd2;
+                player_right <= step_right;
+                walk_phase <= walk_phase + 3'd1;
+                if (walk_phase == 3'd7) walk_frame <= ~walk_frame;
             end else begin
-                if (player_x <= 10'd18) begin
-                    player_x <= 10'd16;
-                    player_right <= 1'b1;
-                end else player_x <= player_x - 10'd2;
+                walk_phase <= 3'd0;
+                walk_frame <= 1'b0;
             end
-
-            // Change the leg pose every eight frames.
-            walk_phase <= walk_phase + 3'd1;
-            if (walk_phase == 3'd7) walk_frame <= ~walk_frame;
         end
     end
 

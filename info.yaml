@@ -17,15 +17,16 @@ project:
     - "bg_renderer.v"
     - "top_mario.v"
     - "map_rom.v"
+    - "gamepad_pmod.v"
 
 pinout:
-  ui[0]: ""
-  ui[1]: ""
+  ui[0]: "Camera left"
+  ui[1]: "Camera right"
   ui[2]: ""
   ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
+  ui[4]: "Gamepad PMOD latch"
+  ui[5]: "Gamepad PMOD clock"
+  ui[6]: "Gamepad PMOD data"
   ui[7]: ""
 
   uo[0]: "R1"
