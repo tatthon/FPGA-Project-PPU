@@ -8,7 +8,7 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 - World background: **1280 × 480 pixels** (80 × 30 tiles).
 - Each tile is **16 × 16 pixels**; atlas has **256 tiles**.
 - Color format: **RGB222**, 2 bits per channel (6 bits per pixel).
-- **Manual horizontal scrolling** via two active-high inputs.
+- Horizontal scrolling follows the character at either screen edge. Two active-high inputs also control the camera manually.
 - Camera stops at the left and right world boundaries.
 - A 16 × 24 RGB222 character walks and faces left or right while a direction is held on controller 1 of the Gamepad PMOD.
 
@@ -18,14 +18,14 @@ A Verilog-based **side-scrolling forest scene** for a 640 × 480 VGA display. Th
 | --- | --- |
 | `ui_in[0] = 1`, `ui_in[1] = 0` | Move camera left (scene shifts right) |
 | `ui_in[0] = 0`, `ui_in[1] = 1` | Move camera right (scene shifts left) |
-| Neither or both inputs asserted | Hold camera position |
+| Neither or both camera inputs asserted | No manual camera movement |
 | Gamepad D-pad Left or Right | Walk in the pressed direction |
 | Neither or both D-pad directions pressed | Stand still |
 | `rst_n = 0` | Reset camera and character position |
 
 The [default Gamepad PMOD pinout](https://github.com/psychogenic/gamepad-pmod#default-tt-configuration) uses `ui_in[4]` for latch, `ui_in[5]` for clock, and `ui_in[6]` for data.
 
-Scrolling changes the camera position once per frame (1 pixel per frame). The character moves 2 pixels per frame between screen x positions 16 and 608. Its leg pose changes every eight frames while moving. The character is drawn at y=408. Adjust `PLAYER_Y` in `src/top_mario.v` to place it on a different row of the map. Camera offsets range from 0 to 640 pixels (`1280 - 640`).
+The character walks 4 pixels per frame between screen x positions 0 and 624. When the character reaches a screen edge and keeps walking, the camera scrolls in that direction at up to 4 pixels per frame. Edge scrolling takes priority over the manual camera inputs, which otherwise scroll by 1 pixel per frame. The camera stops at offsets 0 and 640. The leg pose changes every four frames while walking, including during edge scrolling. The character starts at y=360 so its feet sit directly above the ground at y=384.
 
 ## Project structure
 

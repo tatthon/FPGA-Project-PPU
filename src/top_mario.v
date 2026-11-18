@@ -40,38 +40,59 @@ module tt_um_vga_example (
 
     reg [9:0] scrollOffset;
     wire frame_tick = (pix_x == 10'd0) && (pix_y == 10'd480);
-    localparam [9:0] PLAYER_MIN_X = 10'd16;
-    localparam [9:0] PLAYER_MAX_X = 10'd608;
+    localparam [9:0] PLAYER_WIDTH = 10'd16;
+    localparam [9:0] PLAYER_HEIGHT = 10'd24;
+    localparam [9:0] PLAYER_MIN_X = 10'd0;
+    localparam [9:0] PLAYER_MAX_X = 10'd640 - PLAYER_WIDTH;
+    localparam [9:0] WALK_SPEED = 10'd4;
+    localparam [9:0] MAX_SCROLL = 10'd640;
+    localparam [9:0] GROUND_Y = 10'd384;
+    localparam [9:0] PLAYER_Y = GROUND_Y - PLAYER_HEIGHT;
     reg [9:0] player_x;
     reg player_right;
-    reg [2:0] walk_phase;
+    reg [1:0] walk_phase;
     reg walk_frame;
-    wire step_left = pad_left && !pad_right && (player_x > PLAYER_MIN_X);
-    wire step_right = pad_right && !pad_left && (player_x < PLAYER_MAX_X);
+    wire walk_left = pad_left && !pad_right;
+    wire walk_right = pad_right && !pad_left;
+    wire step_left = walk_left && (player_x > PLAYER_MIN_X);
+    wire step_right = walk_right && (player_x < PLAYER_MAX_X);
+    wire scroll_left = walk_left && (player_x == PLAYER_MIN_X);
+    wire scroll_right = walk_right && (player_x == PLAYER_MAX_X);
+    wire walking = step_left || step_right ||
+                   (scroll_left && (scrollOffset != 10'd0)) ||
+                   (scroll_right && (scrollOffset != MAX_SCROLL));
     always @(posedge clk) begin
         if (!rst_n) begin
             scrollOffset <= 10'd0;
             player_x <= 10'd48;
             player_right <= 1'b1;
-            walk_phase <= 3'd0;
+            walk_phase <= 2'd0;
             walk_frame <= 1'b0;
         end else if (frame_tick) begin
-            if (ui_in[0] && !ui_in[1]) begin
-              scrollOffset <= (scrollOffset == 10'd0)
-                            ? 10'd0 : scrollOffset - 10'd1;
-            end
-            if (!ui_in[0] && ui_in[1]) begin
-              scrollOffset <= (scrollOffset == 10'd640)
-                            ? 10'd640 : scrollOffset + 10'd1;
+            // At the screen edge, continue walking by moving the camera.
+            if (scroll_left) begin
+                scrollOffset <= (scrollOffset < WALK_SPEED)
+                              ? 10'd0 : scrollOffset - WALK_SPEED;
+            end else if (scroll_right) begin
+                scrollOffset <= (scrollOffset > MAX_SCROLL - WALK_SPEED)
+                              ? MAX_SCROLL : scrollOffset + WALK_SPEED;
+            end else if (ui_in[0] && !ui_in[1] && (scrollOffset != 10'd0)) begin
+                scrollOffset <= scrollOffset - 10'd1;
+            end else if (!ui_in[0] && ui_in[1] && (scrollOffset != MAX_SCROLL)) begin
+                scrollOffset <= scrollOffset + 10'd1;
             end
 
-            if (step_left || step_right) begin
-                player_x <= step_right ? player_x + 10'd2 : player_x - 10'd2;
-                player_right <= step_right;
-                walk_phase <= walk_phase + 3'd1;
-                if (walk_phase == 3'd7) walk_frame <= ~walk_frame;
+            if (step_left)
+                player_x <= player_x - WALK_SPEED;
+            else if (step_right)
+                player_x <= player_x + WALK_SPEED;
+
+            if (walking) begin
+                player_right <= walk_right;
+                walk_phase <= walk_phase + 2'd1;
+                if (&walk_phase) walk_frame <= ~walk_frame;
             end else begin
-                walk_phase <= 3'd0;
+                walk_phase <= 2'd0;
                 walk_frame <= 1'b0;
             end
         end
@@ -120,11 +141,10 @@ module tt_um_vga_example (
         end
     end
 
-    localparam [9:0] PLAYER_Y = 10'd408;
     wire sprite_in_box = (pix_x_d2 >= player_x_d2) &&
-                         (pix_x_d2 < player_x_d2 + 10'd16) &&
+                         (pix_x_d2 < player_x_d2 + PLAYER_WIDTH) &&
                          (pix_y_d2 >= PLAYER_Y) &&
-                         (pix_y_d2 < PLAYER_Y + 10'd24);
+                         (pix_y_d2 < PLAYER_Y + PLAYER_HEIGHT);
     wire [3:0] sprite_local_x = pix_x_d2 - player_x_d2;
     wire [3:0] sprite_x = player_right_d2 ? sprite_local_x : 4'd15 - sprite_local_x;
     wire [4:0] sprite_y = pix_y_d2 - PLAYER_Y;
